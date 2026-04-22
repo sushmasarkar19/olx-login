@@ -2,105 +2,124 @@ package com.sushma.olxlogin.service.impl;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.sushma.olxlogin.Repository.AuthenticatedUserRepository;
 import com.sushma.olxlogin.Repository.OlxLoginRepository;
-import com.sushma.olxlogin.dto.AuthenticateResponseUserDto;
-import com.sushma.olxlogin.dto.AuthenticateUserRequestDto;
+import com.sushma.olxlogin.dto.AuthRequestDto;
+import com.sushma.olxlogin.dto.AuthResponseDto;
 import com.sushma.olxlogin.dto.UserDto;
-import com.sushma.olxlogin.entity.AuthenticatedUserEntity;
 import com.sushma.olxlogin.entity.UserEntity;
-import com.sushma.olxlogin.exception.handler.ConflictException;
 import com.sushma.olxlogin.exception.handler.InvalidTokenException;
+import com.sushma.olxlogin.exception.handler.UsernameNotFoundException;
 import com.sushma.olxlogin.service.OlxLoginService;
+import com.sushma.olxlogin.utility.JwtUtil;
+import com.sushma.olxlogin.utility.TokenBlacklist;
+
+import jakarta.transaction.Transactional;
+import lombok.extern.log4j.Log4j2;
 
 @Service
+@Log4j2
 public class OlxLoginServiceImpl implements OlxLoginService {
 
 	@Autowired
-	public OlxLoginRepository loginRepository;
+	public OlxLoginRepository userRepository;
 
 	@Autowired
 	private ModelMapper modelMapper;
 
 	@Autowired
-	private AuthenticatedUserRepository authenticatedUserRepository;
+	private PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private JwtUtil jwtTokenUtil;
+	@Autowired
+	private TokenBlacklist tokenBlacklist;
+
+	@Autowired
+	private AuthenticationManager authenticationManager;
 
 	private Map<String, String> tokenStore = new HashMap();
 
 	@Override
-	public AuthenticateResponseUserDto authenticateUser(AuthenticateUserRequestDto userDto) {
+	public AuthResponseDto authenticateUser(AuthRequestDto userDto) {
 		try {
-			AuthenticatedUserEntity requestEntity = new AuthenticatedUserEntity();
-			requestEntity.setUsername(userDto.getUserName());
 
-			AuthenticatedUserEntity authenticatedUserEntity = authenticatedUserRepository.save(requestEntity);
+			Authentication authentication = authenticationManager.authenticate(
+					new UsernamePasswordAuthenticationToken(userDto.getUserName(), userDto.getPassword()));
 
-			return new AuthenticateResponseUserDto(authenticatedUserEntity.getToken().toString());
+			// authentication.getName() is the username confirmed by Spring Security
+			return new AuthResponseDto(jwtTokenUtil.generateToken(authentication.getName()));
 		} catch (Exception e) {
 			throw new InvalidTokenException("Failed to authenticate user.");
 		}
 	}
 
+	/**
+	 * Invalidates the token by adding it to the in-memory blacklist. Returns true
+	 * on success.
+	 */
 	@Override
-	public Boolean logoutUser(String token) {
-		UUID uuid = UUID.fromString(token);
-		authenticatedUserRepository.deleteById(uuid);
-		return true;
+	public Boolean logoutUser(String authHeader) {
+log.info("Inside logoutUser");
+		String token = jwtTokenUtil.extractBearerToken(authHeader);
+		log.info("token: "+token);
+		if (token != null && jwtTokenUtil.isTokenValid(token) && !tokenBlacklist.contains(token)) {
+			log.info("Token is valid");
+			tokenBlacklist.add(token);
+			return true;
+		}else if (tokenBlacklist.contains(token)) {
+			log.info("Already logged out");
+		}
+		return false;
+
+//		UUID uuid = UUID.fromString(token);
+//		authenticatedUserRepository.deleteById(uuid);
+		// return true;
 	}
 
 	@Override
+	@Transactional
 	public UserDto createUser(UserDto userDto) {
 		try {
-			System.out.println("userDto:"+userDto.toString());
 			UserEntity userEntity = modelMapper.map(userDto, UserEntity.class);
-			System.out.println("userEntity:"+userEntity.toString());
-			UserEntity savedUser = loginRepository.save(userEntity);
-			System.out.println("savedUser:"+savedUser.toString());
+
+			userEntity.setPassword(passwordEncoder.encode(userDto.getPassword()));
+			userEntity.setRoles("ROLE_USER");
+			userEntity.setActive("true");
+
+			UserEntity savedUser = userRepository.save(userEntity);
 			return modelMapper.map(savedUser, UserDto.class);
 		} catch (Exception e) {
-
-			throw new ConflictException("User already exists"); // will handle it later
+			throw new RuntimeException("Failed to create user", e); // will handle it later
 		}
 	}
 
 	@Override
-	public UserDto getUserInformation(String token) {
+	public Boolean validateToken(String authHeader) {
 
-		UUID tokenUUID = UUID.fromString(token);
-
-		AuthenticatedUserEntity authenticatedUserEntity = authenticatedUserRepository.findById(tokenUUID)
-				.orElseThrow(() -> new RuntimeException("Token not valid."));
-
-		// String userName = getUserFromToken(token);
-		try {
-			UserEntity userEntity = loginRepository.findByUserName(authenticatedUserEntity.getUsername())
-					.orElseThrow(() -> new RuntimeException("User not found"));
-
-			return modelMapper.map(userEntity, UserDto.class);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			throw new InvalidTokenException("Invalid token");
-		}
-
-	}
-
-	@Override
-	public Boolean validateToken(String token) {
-		AuthenticatedUserEntity authenticatedUserEntity = authenticatedUserRepository.findById(UUID.fromString(token))
-				.orElseThrow(() -> new RuntimeException("Invalid token."));
-
-		if (authenticatedUserEntity.getUsername() != null)
-			return true;
-		else
+		String token = jwtTokenUtil.extractBearerToken(authHeader);
+		if (token == null || tokenBlacklist.contains(token)) {
 			return false;
+		}
+		return jwtTokenUtil.isTokenValid(token);
 	}
+
+//		AuthenticatedUserEntity authenticatedUserEntity = authenticatedUserRepository.findById(UUID.fromString(token))
+//				.orElseThrow(() -> new RuntimeException("Invalid token."));
+//
+
+//		if (authenticatedUserEntity.getUsername() != null)
+//			return true;
+//		else
+//			return false;
 
 	public String getUserFromToken(String token) {
 		String user = tokenStore.get(token);
@@ -108,6 +127,14 @@ public class OlxLoginServiceImpl implements OlxLoginService {
 			throw new RuntimeException("Invalid token");
 		}
 		return user;
+	}
+
+	@Override
+	public UserDto getUserByUsername(String userName) {
+		UserEntity userEntity = userRepository.findByUserName(userName)
+				.orElseThrow(() -> new UsernameNotFoundException("User not found: " + userName));
+
+		return modelMapper.map(userEntity, UserDto.class);
 	}
 
 }

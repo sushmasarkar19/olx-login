@@ -10,6 +10,14 @@ import com.sushma.olxlogin.dto.ErrorResponse;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 	
+	
+	@ExceptionHandler(UsernameNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidTokenexception(UsernameNotFoundException ex){
+		 ErrorResponse error = new ErrorResponse(ex.getMessage(), 404);
+	        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+	}
+	
+	
 	@ExceptionHandler(InvalidTokenException.class)
 	public ResponseEntity<ErrorResponse> handleInvalidTokenexception(InvalidTokenException ex){
 		 ErrorResponse error = new ErrorResponse(ex.getMessage(), 400);

@@ -1,10 +1,10 @@
 package com.sushma.olxlogin.dto;
 
-public class AuthenticateResponseUserDto {
+public class AuthResponseDto {
 
 	private String token;
 
-	public AuthenticateResponseUserDto(String token) {
+	public AuthResponseDto(String token) {
 		super();
 		this.token = token;
 	}
