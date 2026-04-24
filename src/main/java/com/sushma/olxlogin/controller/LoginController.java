@@ -71,6 +71,7 @@ public class LoginController {
 
 	@GetMapping("/token/validate")
 	public ResponseEntity<Boolean> validateToken(@RequestHeader("Authorization") String authHeader) {
+		log.info("token validation started");
 		return new ResponseEntity<Boolean>(loginService.validateToken(authHeader), HttpStatus.OK);
 	}
 

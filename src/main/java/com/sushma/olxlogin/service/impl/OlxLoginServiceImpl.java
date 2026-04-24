@@ -104,12 +104,18 @@ log.info("Inside logoutUser");
 
 	@Override
 	public Boolean validateToken(String authHeader) {
-
-		String token = jwtTokenUtil.extractBearerToken(authHeader);
-		if (token == null || tokenBlacklist.contains(token)) {
-			return false;
+		
+		try {
+			String token = jwtTokenUtil.extractBearerToken(authHeader);
+			if (token == null || tokenBlacklist.contains(token)) {
+				return false;
+			}
+			return jwtTokenUtil.isTokenValid(token); 
+		}catch (Exception e) {
+			throw new InvalidTokenException("Token is not valid");
 		}
-		return jwtTokenUtil.isTokenValid(token);
+
+		
 	}
 
 //		AuthenticatedUserEntity authenticatedUserEntity = authenticatedUserRepository.findById(UUID.fromString(token))
