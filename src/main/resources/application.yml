@@ -2,9 +2,10 @@ server:
   port: 8081
   servlet:
     context-path: /olx
+  forward-headers-strategy: framework
 spring:
   application:
-    name: olx-Login
+    name: olx-login
   datasource:
     url: jdbc:mysql://localhost:3306/olxlogin
     username: root
@@ -21,5 +22,11 @@ eureka:
   client:
     service-url:
      defaultZone: http://localhost:8761/eureka
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+springdoc:
+  api-docs:
+    path: /v3/api-docs
       
       

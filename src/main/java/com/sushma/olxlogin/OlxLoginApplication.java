@@ -1,5 +1,7 @@
 package com.sushma.olxlogin;
 
+import java.util.List;
+
 import org.modelmapper.ModelMapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -12,6 +14,7 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
 
 @SpringBootApplication
 @EnableDiscoveryClient
@@ -37,6 +40,7 @@ public class OlxLoginApplication {
 	        final String securitySchemeName = "bearerAuth";
 
 	        return new OpenAPI()
+	                .servers(List.of(new Server().url("/gateway")))
 	                .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
 	                .components(new Components()
 	                        .addSecuritySchemes(securitySchemeName,
