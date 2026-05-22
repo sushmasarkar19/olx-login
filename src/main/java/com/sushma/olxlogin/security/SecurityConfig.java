@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -22,17 +21,11 @@ import com.sushma.olxlogin.service.CustomUserDetailsService;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // ── Swagger paths ──────────────────────────────────────────────────────
-    // No /olx prefix here. requestMatchers() receives the path AFTER the
-    // context-path (/olx) has been stripped by the servlet container.
-    private static final String[] SWAGGER_PATHS = {
-        "/swagger-ui.html",
-        "/swagger-ui/**",
-        "/v3/api-docs",
-        "/v3/api-docs/**",
-        "/swagger-resources",
-        "/swagger-resources/**",
-        "/webjars/**"
+    // ── Swagger / Actuator paths ───────────────────────────────────────────
+    private static final String[] PUBLIC_PATHS = {
+        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs",
+        "/v3/api-docs/**", "/swagger-resources", "/swagger-resources/**",
+        "/webjars/**", "/actuator/**"
     };
 
     @Autowired
@@ -54,9 +47,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
+    public AuthenticationManager authenticationManager() {
+        return new org.springframework.security.authentication.ProviderManager(authenticationProvider());
     }
 
     @Bean
@@ -69,20 +61,11 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(auth -> auth
 
-                // ── Swagger UI ────────────────────────────────────────────
-                .requestMatchers(SWAGGER_PATHS).permitAll()
+                .requestMatchers(PUBLIC_PATHS).permitAll()
 
-                // ── Public application endpoints ──────────────────────────
-                // BUG FIX: paths must NOT include /olx context-path prefix.
-                // Spring Security evaluates paths after the servlet container
-                // strips the context-path. With server.servlet.context-path=/olx:
-                //   Browser URL:             /olx/user/authenticate
-                //   What Spring Security sees: /user/authenticate   ← use this
                 .requestMatchers(HttpMethod.POST, "/user/authenticate").permitAll()
                 .requestMatchers(HttpMethod.POST, "/user").permitAll()
-                .requestMatchers(HttpMethod.GET,  "/user/debug/**").permitAll()
 
-                // ── Everything else requires a valid JWT ──────────────────
                 .anyRequest().authenticated()
             )
 
