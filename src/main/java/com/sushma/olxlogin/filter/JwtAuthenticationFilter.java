@@ -52,18 +52,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     //
     // Rule: PUBLIC_PATHS here must mirror the permitAll() rules in SecurityConfig exactly.
     private static final List<String> PUBLIC_PATHS = List.of(
-        // Application public endpoints (no /olx prefix, leading slash required)
-        "/user/authenticate",
-        "/user",
-        "/user/debug/**",
-        // Swagger UI
-        "/swagger-ui.html",
-        "/swagger-ui/**",
-        "/v3/api-docs",
-        "/v3/api-docs/**",
-        "/swagger-resources",
-        "/swagger-resources/**",
-        "/webjars/**"
+        "/user/authenticate", "/user",
+        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs",
+        "/v3/api-docs/**", "/swagger-resources", "/swagger-resources/**",
+        "/webjars/**", "/actuator/**"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
@@ -159,5 +151,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         body.put("hint",  hint);
 
         objectMapper.writeValue(response.getWriter(), body);
+        response.flushBuffer();
     }
 }
